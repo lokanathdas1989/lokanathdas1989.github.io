@@ -1,5 +1,5 @@
 // ===== Fixed-size D3 narrative (NaNs removed, aggregates excluded, dynamic Scene 3 title) =====
-let scene = 0;  // 0: global average, 1: top5 latest, 2: explore selected country
+let scene = 0;  // 0: global average, 1: top30 bubble (latest year), 2: explore selected country
 let data = [];
 let selectedCountry = null;
 
@@ -9,7 +9,7 @@ const dd = d3.select("#countryDropdown");
 const btnNext = d3.select("#next");
 const btnPrev = d3.select("#prev");
 
-const margin = { top: 54, right: 32, bottom: 70, left: 84 };
+const margin = { top: 54, right: 36, bottom: 70, left: 140 }; // more left for country names
 const width  = +svg.attr("width");
 const height = +svg.attr("height");
 const innerWidth  = width - margin.left - margin.right;
@@ -53,7 +53,7 @@ function cleanSeries(series){ return series.filter(d => Number.isFinite(d.value)
 function cleanRows(rows){ return rows.filter(d => Number.isFinite(d.value) && Number.isFinite(d.year)); }
 function yearExtentClean(arr){ return (!arr.length) ? null : d3.extent(arr, d => d.year); }
 
-// Exclude aggregates/regions (Scene 2 top-5 should be real countries only)
+// Exclude aggregates/regions (Scene 2 should be real countries only)
 function isAggregate(name){
   if (!name) return true;
   if (name.includes("(")) return true; // e.g., "Africa (GCP)"
@@ -100,11 +100,11 @@ function render(){
   hideTip();
 
   if (scene === 0) return renderGlobalAverage();
-  if (scene === 1) return renderTop5Latest();
+  if (scene === 1) return renderTop30Bubble();
   return renderCountryExplore();
 }
 
-function drawAxes(g, x, y){
+function drawAxes(g, x, y, xLabel = "Year", yLabel = "CO₂ per capita (tonnes)"){
   g.append("g").attr("class","axis")
     .attr("transform", `translate(0,${innerHeight})`)
     .call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("d")));
@@ -112,11 +112,11 @@ function drawAxes(g, x, y){
 
   g.append("text").attr("class","axis-label")
     .attr("x", innerWidth/2).attr("y", innerHeight + 52)
-    .attr("text-anchor","middle").text("Year");
+    .attr("text-anchor","middle").text(xLabel);
   g.append("text").attr("class","axis-label")
     .attr("transform","rotate(-90)")
     .attr("x", -innerHeight/2).attr("y", -64)
-    .attr("text-anchor","middle").text("CO₂ per capita (tonnes)");
+    .attr("text-anchor","middle").text(yLabel);
 }
 
 function showTip(html, event){
@@ -155,7 +155,7 @@ function renderGlobalAverage(){
   const x = d3.scaleLinear().domain(yearExtentClean(clean)).range([0, innerWidth]);
   const y = d3.scaleLinear().domain([0, d3.max(clean, d => d.value)]).nice().range([innerHeight, 0]);
 
-  drawAxes(g, x, y);
+  drawAxes(g, x, y, "Year", "CO₂ per capita (tonnes)");
 
   const line = d3.line().x(d => x(d.year)).y(d => y(d.value));
   g.append("path").datum(clean)
@@ -182,13 +182,14 @@ function latestYearWithMinCountCountries(minCount){
   return d3.max(numericCountryRows, d => d.year);
 }
 
-/* ---------------- Scene 1: Top 5 latest (real countries only) ---------------- */
-function renderTop5Latest(){
-  const latestYear = latestYearWithMinCountCountries(5);
+/* ---------------- Scene 1 (now) — Top 30 Bubble Chart ---------------- */
+function renderTop30Bubble(){
+  // Find the most recent year with at least 30 numeric country values
+  const latestYear = latestYearWithMinCountCountries(30);
 
   setSceneHeader(
-    `Scene 2 — Top 5 Countries in ${latestYear ?? "N/A"}`,
-    "Who emits the most CO₂ per person in the most recent well-covered year?"
+    `Scene 2 — Top 30 Countries in ${latestYear}`,
+    "Largest CO₂ per capita values in the latest well‑covered year. Bubble size ∝ value."
   );
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -199,67 +200,106 @@ function renderTop5Latest(){
       .attr("text-anchor","middle").text("No year found with enough numeric country values.");
   }
 
-  const atLatestClean = cleanRows(
-    data.filter(d => d.year === latestYear && !isAggregate(d.country))
-  );
-  if (!atLatestClean.length){
-    return g.append("text")
-      .attr("x", innerWidth/2).attr("y", innerHeight/2)
+  // Filter: latestYear, real countries only, numeric
+  const rows = cleanRows(data.filter(d => d.year === latestYear && !isAggregate(d.country)));
+  if (!rows.length){
+    return g.append("text").attr("x", innerWidth/2).attr("y", innerHeight/2)
       .attr("text-anchor","middle").text("No numeric data for real countries in that year.");
   }
 
-  const top5 = atLatestClean.sort((a,b) => b.value - a.value)
-                            .slice(0,5)
-                            .map(d => d.country);
+  // Pick top 30 by value (desc)
+  const top30 = rows.sort((a,b) => b.value - a.value).slice(0, 30);
 
-  const filteredClean = cleanRows(data.filter(d => top5.includes(d.country)));
-  if (!filteredClean.length){
-    return g.append("text")
-      .attr("x", innerWidth/2).attr("y", innerHeight/2)
-      .attr("text-anchor","middle").text("No numeric history for the selected countries.");
-  }
+  // Scales
+  const maxVal = d3.max(top30, d => d.value);
+  const x = d3.scaleLinear()
+    .domain([0, maxVal * 1.05])
+    .range([0, innerWidth]);
 
-  const x = d3.scaleLinear().domain(yearExtentClean(filteredClean)).range([0, innerWidth]);
-  const y = d3.scaleLinear().domain([0, d3.max(filteredClean, d => d.value)]).nice().range([innerHeight, 0]);
+  // y: country names (ranked by value), highest at top
+  const y = d3.scaleBand()
+    .domain(top30.map(d => d.country))
+    .range([0, innerHeight])
+    .padding(0.25);
 
-  drawAxes(g, x, y);
+  // Bubble radius: sqrt scale (area ∝ value)
+  const r = d3.scaleSqrt().domain([0, maxVal]).range([4, 22]);
 
-  const palette = ["#1f77b4","#9467bd","#2ca02c","#ff7f0e","#d62728"];
-  const color = d3.scaleOrdinal().domain(top5).range(palette);
+  // Axes (note: y axis lists country names; x axis is CO2 per capita)
+  g.append("g").attr("class","axis")
+    .attr("transform", `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(x).ticks(8));
+  g.append("g").attr("class","axis").call(d3.axisLeft(y));
 
-  // Legend
-  const legend = g.append("g").attr("class","legend").attr("transform","translate(0,-28)");
-  top5.forEach((c,i) => {
-    const group = legend.append("g").attr("transform", `translate(${i*175},0)`);
-    group.append("rect").attr("x",0).attr("y",-12).attr("width",170).attr("height",24).attr("fill","transparent");
-    group.append("rect").attr("x",6).attr("y",-8).attr("width",12).attr("height",12).attr("fill",color(c));
-    group.append("text").attr("x",24).attr("y",2).text(c);
-  });
+  // Axis labels (overrides label text)
+  g.append("text").attr("class","axis-label")
+    .attr("x", innerWidth/2).attr("y", innerHeight + 52)
+    .attr("text-anchor","middle").text("CO₂ per capita (tonnes)");
+  g.append("text").attr("class","axis-label")
+    .attr("transform","rotate(-90)")
+    .attr("x", -innerHeight/2).attr("y", -110) // more left to avoid y labels
+    .attr("text-anchor","middle").text("Country");
 
-  const line = d3.line().x(d => x(d.year)).y(d => y(d.value));
+  // Bubbles
+  const bubbles = g.selectAll(".bubble")
+    .data(top30, d => d.country)
+    .join("circle")
+    .attr("class", "bubble")
+    .attr("cx", d => x(d.value))
+    .attr("cy", d => y(d.country) + y.bandwidth()/2)
+    .attr("r", d => r(d.value))
+    .attr("fill", "#9467bd")
+    .attr("fill-opacity", 0.85)
+    .attr("stroke", "rgba(0,0,0,0.25)")
+    .attr("stroke-width", 0.5)
+    .on("mousemove", (event,d) => {
+      showTip(
+        `<strong>${d.country}</strong><br>${latestYear}: ${d.value.toFixed(2)} t/person`,
+        event
+      );
+    })
+    .on("mouseleave", hideTip);
 
-  top5.forEach(cn => {
-    const seriesClean = cleanSeries(
-      data.filter(d => d.country === cn).sort((a,b)=>a.year-b.year)
-    );
-    if (!seriesClean.length) return;
+  // Value labels to the right (optional but helpful)
+  g.selectAll(".val-label")
+    .data(top30)
+    .join("text")
+    .attr("class", "val-label")
+    .attr("x", d => x(d.value) + Math.max(10, r(d.value) + 6))
+    .attr("y", d => y(d.country) + y.bandwidth()/2 + 4)
+    .attr("fill", "#394366")
+    .attr("font-size", 11)
+    .text(d => d.value.toFixed(2));
 
-    g.append("path")
-      .datum(seriesClean)
-      .attr("fill","none").attr("stroke", color(cn)).attr("stroke-width", 2)
-      .attr("d", line);
+  // ----- Size Legend (three bubbles) -----
+  const legend = g.append("g").attr("transform", `translate(${innerWidth - 180}, 0)`);
+  const legendTitle = legend.append("text")
+    .attr("x", 0).attr("y", 0)
+    .attr("fill", "#394366").attr("font-size", 12).text("Bubble size = t/person");
 
-    const pts = seriesClean.length > 200
-      ? seriesClean.filter((_,i)=> i%Math.ceil(seriesClean.length/200)===0)
-      : seriesClean;
+  // pick representative sizes (min>0, mid, max)
+  const vals = top30.map(d => d.value).filter(v => v > 0);
+  const minV = d3.min(vals), maxV2 = d3.max(vals);
+  const midV = d3.quantile(vals.sort(d3.ascending), 0.5);
+  const legendVals = [minV, midV, maxV2].filter(v => Number.isFinite(v));
 
-    g.selectAll(`.dot-${cn.replace(/\s+/g,'_')}`)
-      .data(pts).enter().append("circle")
-      .attr("cx", d => x(d.year)).attr("cy", d => y(d.value))
-      .attr("r", 3).attr("fill", color(cn))
-      .on("mousemove", (event,d) => showTip(
-        `<strong>${cn}</strong><br>${d.year}: ${d.value.toFixed(2)} t/person`, event))
-      .on("mouseleave", hideTip);
+  const baseY = 18;
+  legendVals.forEach((v, i) => {
+    const cy = baseY + i * 38;
+    legend.append("circle")
+      .attr("cx", 18)
+      .attr("cy", cy)
+      .attr("r", r(v))
+      .attr("fill", "#9467bd")
+      .attr("fill-opacity", 0.85)
+      .attr("stroke", "rgba(0,0,0,0.25)")
+      .attr("stroke-width", 0.5);
+    legend.append("text")
+      .attr("x", 18 + r(v) + 10)
+      .attr("y", cy + 4)
+      .attr("fill", "#394366")
+      .attr("font-size", 12)
+      .text(`${v.toFixed(2)} t/person`);
   });
 }
 
@@ -276,9 +316,11 @@ function renderCountryExplore(){
   const series = cleanSeries(rawSeries);
 
   if (!series.length){
-    drawAxes(g,
+    drawAxes(
+      g,
       d3.scaleLinear().domain(d3.extent(rawSeries, d => d.year)).range([0, innerWidth]),
-      d3.scaleLinear().domain([0, 1]).range([innerHeight, 0])
+      d3.scaleLinear().domain([0, 1]).range([innerHeight, 0]),
+      "Year", "CO₂ per capita (tonnes)"
     );
     return g.append("text")
       .attr("x", innerWidth/2).attr("y", innerHeight/2)
@@ -289,7 +331,7 @@ function renderCountryExplore(){
   const x = d3.scaleLinear().domain(yearExtentClean(series)).range([0, innerWidth]);
   const y = d3.scaleLinear().domain([0, d3.max(series, d => d.value)]).nice().range([innerHeight, 0]);
 
-  drawAxes(g, x, y);
+  drawAxes(g, x, y, "Year", "CO₂ per capita (tonnes)");
 
   const line = d3.line().x(d => x(d.year)).y(d => y(d.value));
   g.append("path").datum(series).attr("fill","none").attr("stroke","#8a63d2").attr("stroke-width", 2).attr("d", line);
