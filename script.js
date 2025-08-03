@@ -1,4 +1,4 @@
-// ===== Martini Glass Narrative Visualization =====
+// Martini Glass Narrative Visualization
 let scene = 0;
 let data = [];
 let selectedCountry = null;
@@ -18,7 +18,6 @@ const innerHeight = height - margin.top - margin.bottom;
 btnNext.on("click", () => { scene = Math.min(2, scene + 1); updateSteps(); render(); });
 btnPrev.on("click", () => { scene = Math.max(0, scene - 1); updateSteps(); render(); });
 
-// --- Numeric parse for co2_per_capita ---
 function parseValue(raw){
   const v = (raw ?? "").toString().trim();
   if (!v) return NaN;
@@ -26,16 +25,15 @@ function parseValue(raw){
   return Number.isFinite(num) ? num : NaN;
 }
 
-// --- Load dataset (headers: country,year,co2_per_capita) ---
+// Load dataset
 d3.csv("data/co2.csv", d => ({
   country: d.country,
   year: +d.year,
   value: parseValue(d.co2_per_capita)
 })).then(rows => {
-  // Keep rows with numeric year; value with NaN will be cleaned per scene)
+ 
   data = rows.filter(r => Number.isFinite(r.year));
 
-  // Default country = first with numeric values (else first alphabetically)
   const countriesWithValues = Array.from(
     d3.group(data.filter(d => Number.isFinite(d.value)), d => d.country).keys()
   ).sort();
@@ -48,15 +46,16 @@ d3.csv("data/co2.csv", d => ({
   render();
 });
 
-/* ---------------- Utilities ---------------- */
+// Utilities
 function cleanSeries(series){ return series.filter(d => Number.isFinite(d.value) && Number.isFinite(d.year)); }
 function cleanRows(rows){ return rows.filter(d => Number.isFinite(d.value) && Number.isFinite(d.year)); }
 function yearExtentClean(arr){ return (!arr.length) ? null : d3.extent(arr, d => d.year); }
 
-// Exclude aggregates/regions (Scene 2 top-5 should be real countries only)
+// Exclude aggregate regions
+
 function isAggregate(name){
   if (!name) return true;
-  if (name.includes("(")) return true; // e.g., "Africa (GCP)"
+  if (name.includes("(")) return true;
   const k = name.toLowerCase();
   return [
     "world","europe","asia","africa","americas","north america","south america",
@@ -66,17 +65,17 @@ function isAggregate(name){
   ].some(term => k.includes(term));
 }
 
-/* ---------------- UI pairing ---------------- */
+// UI pairing
 function setupDropdown(countries){
   dd.selectAll("option").data(countries).join("option")
     .attr("value", d => d).text(d => d);
 
   if (selectedCountry) dd.property("value", selectedCountry);
 
-  // Re-render immediately when the user changes the country (only matters in Scene 3)
+
   dd.on("change", function(){
     selectedCountry = this.value;
-    if (scene === 2) render(); // updates the chart AND the dynamic title
+    if (scene === 2) render();
   });
 }
 
@@ -84,7 +83,7 @@ function updateSteps(){
   for (let i=0;i<3;i++){
     d3.select(`#step-${i}`).classed("current", i === scene);
   }
-  // Dropdown visible & enabled only in Scene 3
+ 
   const show = scene === 2;
   dd.style("display", show ? "inline-block" : "none")
     .property("disabled", !show);
@@ -130,14 +129,13 @@ function hideTip(){
   tooltip.style("opacity", 0).attr("aria-hidden", "true");
 }
 
-/* ---------------- Scene 0: Global average ---------------- */
+// Scene 0: Global average
 function renderGlobalAverage(){
   setSceneHeader("Scene 1 — Global Average",
     "How has global CO₂ per capita changed over time?");
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Yearly global average from numeric rows only
   const yearlyAvg = d3.rollups(
     data.filter(d => Number.isFinite(d.value)),
     v => d3.mean(v, d => d.value),
@@ -168,21 +166,20 @@ function renderGlobalAverage(){
     .on("mouseleave", hideTip);
 }
 
-/* ---------- Helper: latest year with at least N numeric values from real countries ---------- */
 function latestYearWithMinCountCountries(minCount){
   const numericCountryRows = data.filter(d => Number.isFinite(d.value) && !isAggregate(d.country));
   if (!numericCountryRows.length) return undefined;
 
   const byYear = d3.rollups(numericCountryRows, v => v.length, d => d.year)
-                   .sort((a,b) => b[0] - a[0]); // desc year
+                   .sort((a,b) => b[0] - a[0]);
   for (const [yr, cnt] of byYear){
     if (cnt >= minCount) return yr;
   }
-  // Fallback to most recent year with any numeric country values
+
   return d3.max(numericCountryRows, d => d.year);
 }
 
-/* ---------------- Scene 1: Top 5 latest (real countries only) ---------------- */
+// Scene 1: Top 5 countries
 function renderTop5Latest(){
   const latestYear = latestYearWithMinCountCountries(5);
 
@@ -227,7 +224,6 @@ function renderTop5Latest(){
   const palette = ["#1f77b4","#9467bd","#2ca02c","#ff7f0e","#d62728"];
   const color = d3.scaleOrdinal().domain(top5).range(palette);
 
-  // Legend
   const legend = g.append("g").attr("class","legend").attr("transform","translate(0,-28)");
   top5.forEach((c,i) => {
     const group = legend.append("g").attr("transform", `translate(${i*175},0)`);
@@ -263,11 +259,10 @@ function renderTop5Latest(){
   });
 }
 
-/* ---------------- Scene 2: Explore selected country (with dynamic title) ---------------- */
+// Scene 2: Explore selected country
 function renderCountryExplore(){
   dd.style("display","inline-block").property("disabled", false);
 
-  // Dynamic title based on currently selected country
   setSceneHeader(`Scene 3 — Explore: ${selectedCountry}`,
     "Use the dropdown (top right) to switch countries and inspect the curve.");
 
