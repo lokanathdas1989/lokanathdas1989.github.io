@@ -1,5 +1,5 @@
-// ===== Fixed-size D3 narrative (NaNs removed, aggregates excluded in Scene 2) =====
-let scene = 0;  // 0: global average, 1: top5 latest, 2: explore any country
+// ===== Fixed-size D3 narrative (NaNs removed, aggregates excluded, dynamic Scene 3 title) =====
+let scene = 0;  // 0: global average, 1: top5 latest, 2: explore selected country
 let data = [];
 let selectedCountry = null;
 
@@ -18,7 +18,7 @@ const innerHeight = height - margin.top - margin.bottom;
 btnNext.on("click", () => { scene = Math.min(2, scene + 1); updateSteps(); render(); });
 btnPrev.on("click", () => { scene = Math.max(0, scene - 1); updateSteps(); render(); });
 
-// --- Helper: robust numeric parser for co2_per_capita ---
+// --- Robust numeric parse for co2_per_capita ---
 function parseValue(raw){
   const v = (raw ?? "").toString().trim();
   if (!v) return NaN;
@@ -32,10 +32,10 @@ d3.csv("data/co2.csv", d => ({
   year: +d.year,
   value: parseValue(d.co2_per_capita)
 })).then(rows => {
-  // Keep rows with numeric year (value may be NaN; we clean later)
+  // Keep rows with numeric year; value may be NaN (we'll clean per scene)
   data = rows.filter(r => Number.isFinite(r.year));
 
-  // Choose a default country with at least one numeric value
+  // Default country = first with numeric values (else first alphabetically)
   const countriesWithValues = Array.from(
     d3.group(data.filter(d => Number.isFinite(d.value)), d => d.country).keys()
   ).sort();
@@ -49,15 +49,11 @@ d3.csv("data/co2.csv", d => ({
 });
 
 /* ---------------- Utilities ---------------- */
-// Remove NaNs from a single time series
 function cleanSeries(series){ return series.filter(d => Number.isFinite(d.value) && Number.isFinite(d.year)); }
-// Remove NaNs from generic rows
 function cleanRows(rows){ return rows.filter(d => Number.isFinite(d.value) && Number.isFinite(d.year)); }
-// Year extent from cleaned array; null if empty
 function yearExtentClean(arr){ return (!arr.length) ? null : d3.extent(arr, d => d.year); }
 
-// Exclude aggregates/regions for Top‑5 step (Scene 2).
-// This is a lightweight filter: drop names with parentheses or known region keywords.
+// Exclude aggregates/regions (Scene 2 top-5 should be real countries only)
 function isAggregate(name){
   if (!name) return true;
   if (name.includes("(")) return true; // e.g., "Africa (GCP)"
@@ -74,11 +70,13 @@ function isAggregate(name){
 function setupDropdown(countries){
   dd.selectAll("option").data(countries).join("option")
     .attr("value", d => d).text(d => d);
+
   if (selectedCountry) dd.property("value", selectedCountry);
 
+  // Re-render immediately when the user changes the country (only matters in Scene 3)
   dd.on("change", function(){
     selectedCountry = this.value;
-    if (scene === 2) render();
+    if (scene === 2) render(); // updates the chart AND the dynamic title
   });
 }
 
@@ -86,7 +84,8 @@ function updateSteps(){
   for (let i=0;i<3;i++){
     d3.select(`#step-${i}`).classed("current", i === scene);
   }
-  const show = scene === 2; // Only Scene 3 enables exploration
+  // Dropdown visible & enabled only in Scene 3
+  const show = scene === 2;
   dd.style("display", show ? "inline-block" : "none")
     .property("disabled", !show);
 }
@@ -131,14 +130,14 @@ function hideTip(){
   tooltip.style("opacity", 0).attr("aria-hidden", "true");
 }
 
-/* ---------------- Scene 0: Global average (NaNs excluded) ---------------- */
+/* ---------------- Scene 0: Global average ---------------- */
 function renderGlobalAverage(){
   setSceneHeader("Scene 1 — Global Average",
     "How has global CO₂ per capita changed over time?");
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Compute yearly global average from numeric rows only
+  // Yearly global average from numeric rows only
   const yearlyAvg = d3.rollups(
     data.filter(d => Number.isFinite(d.value)),
     v => d3.mean(v, d => d.value),
@@ -171,7 +170,6 @@ function renderGlobalAverage(){
 
 /* ---------- Helper: latest year with at least N numeric values from real countries ---------- */
 function latestYearWithMinCountCountries(minCount){
-  // Consider only rows that are numeric AND whose country is not an aggregate
   const numericCountryRows = data.filter(d => Number.isFinite(d.value) && !isAggregate(d.country));
   if (!numericCountryRows.length) return undefined;
 
@@ -184,7 +182,7 @@ function latestYearWithMinCountCountries(minCount){
   return d3.max(numericCountryRows, d => d.year);
 }
 
-/* ---------------- Scene 1: Top 5 latest — NaN-proof & aggregate-proof ---------------- */
+/* ---------------- Scene 1: Top 5 latest (real countries only) ---------------- */
 function renderTop5Latest(){
   const latestYear = latestYearWithMinCountCountries(5);
 
@@ -201,11 +199,9 @@ function renderTop5Latest(){
       .attr("text-anchor","middle").text("No year found with enough numeric country values.");
   }
 
-  // Only real countries with numeric values in that year
   const atLatestClean = cleanRows(
     data.filter(d => d.year === latestYear && !isAggregate(d.country))
   );
-
   if (!atLatestClean.length){
     return g.append("text")
       .attr("x", innerWidth/2).attr("y", innerHeight/2)
@@ -216,18 +212,13 @@ function renderTop5Latest(){
                             .slice(0,5)
                             .map(d => d.country);
 
-  // Full time series for those countries, numeric only
-  const filteredClean = cleanRows(
-    data.filter(d => top5.includes(d.country))
-  );
-
+  const filteredClean = cleanRows(data.filter(d => top5.includes(d.country)));
   if (!filteredClean.length){
     return g.append("text")
       .attr("x", innerWidth/2).attr("y", innerHeight/2)
       .attr("text-anchor","middle").text("No numeric history for the selected countries.");
   }
 
-  // Domains from cleaned rows only
   const x = d3.scaleLinear().domain(yearExtentClean(filteredClean)).range([0, innerWidth]);
   const y = d3.scaleLinear().domain([0, d3.max(filteredClean, d => d.value)]).nice().range([innerHeight, 0]);
 
@@ -272,10 +263,11 @@ function renderTop5Latest(){
   });
 }
 
-/* ---------------- Scene 2: Explore selected country ---------------- */
+/* ---------------- Scene 2: Explore selected country (dynamic title) ---------------- */
 function renderCountryExplore(){
   dd.style("display","inline-block").property("disabled", false);
 
+  // Dynamic title based on currently selected country
   setSceneHeader(`Scene 3 — Explore: ${selectedCountry}`,
     "Use the dropdown (top right) to switch countries and inspect the curve.");
 
