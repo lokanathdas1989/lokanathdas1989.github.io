@@ -3,51 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <title>Global CO₂ Emissions Per Capita — Narrative</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-  <header class="page-header">
-    <h1>Global CO₂ Emissions Per Capita</h1>
-    <p class="subtitle">A guided story with exploration at the end</p>
-  </header>
+  <div class="wrap">
+    <header class="page-header">
+      <h1>Global CO₂ Emissions Per Capita</h1>
+      <p class="subtitle">Guided story → then explore any country</p>
+    </header>
 
-  <main class="container">
-    <!-- Scene header (title + annotation) -->
-    <section class="scene-header">
-      <h2 id="scene-title"></h2>
-      <p id="scene-note" class="annotation"></p>
-    </section>
-
-    <!-- Controls -->
-    <section class="controls">
+    <!-- Controls toolbar -->
+    <div class="toolbar">
       <div class="nav">
-        <button id="prev" class="btn" aria-label="Previous scene">◀ Back</button>
-        <div class="step-indicator">
+        <button id="prev" class="btn">◀ Back</button>
+        <div class="steps">
           <span id="step-0" class="step current">1</span>
           <span id="step-1" class="step">2</span>
           <span id="step-2" class="step">3</span>
         </div>
-        <button id="next" class="btn" aria-label="Next scene">Next ▶</button>
+        <button id="next" class="btn">Next ▶</button>
       </div>
       <div class="explore">
-        <label for="countryDropdown" class="dropdown-label">Explore a country:</label>
-        <select id="countryDropdown" class="dropdown" aria-label="Choose a country"></select>
+        <label for="countryDropdown">Explore:</label>
+        <select id="countryDropdown" class="dropdown"></select>
       </div>
-    </section>
+    </div>
 
-    <!-- Chart -->
-    <section id="vis-container">
-      <svg id="chart" role="img" aria-label="CO2 emissions per capita chart"></svg>
-      <div id="tooltip" class="tooltip" role="dialog" aria-hidden="true"></div>
-    </section>
+    <!-- Scene title + note -->
+    <div class="scene-header">
+      <h2 id="scene-title"></h2>
+      <p id="scene-note" class="note"></p>
+    </div>
 
-    <!-- Small print -->
-    <section class="footnote">
-      <p>Data: Our World in Data (CO₂ emissions per capita). Values shown as reported in the dataset.</p>
-    </section>
-  </main>
+    <!-- Chart area -->
+    <div id="vis" class="vis">
+      <svg id="chart" width="900" height="520" aria-label="CO₂ per capita chart"></svg>
+      <div id="tooltip" class="tooltip" aria-hidden="true"></div>
+    </div>
+
+    <footer class="foot">
+      Data: Our World in Data — CO₂ emissions per capita (country, year).
+    </footer>
+  </div>
 
   <script src="script.js"></script>
 </body>
