@@ -1,20 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>CO₂ Emissions Narrative</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>Global CO₂ Emissions Per Capita — Narrative</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-  <div id="title">Global CO₂ Emissions Per Capita</div>
-  <div id="vis-container">
-    <svg id="chart" width="900" height="500"></svg>
-  </div>
-  <div id="nav-buttons">
-    <button id="prev">◀ Back</button>
-    <button id="next">Next ▶</button>
-  </div>
+  <header class="page-header">
+    <h1>Global CO₂ Emissions Per Capita</h1>
+    <p class="subtitle">A guided story with exploration at the end</p>
+  </header>
+
+  <main class="container">
+    <!-- Scene header (title + annotation) -->
+    <section class="scene-header">
+      <h2 id="scene-title"></h2>
+      <p id="scene-note" class="annotation"></p>
+    </section>
+
+    <!-- Controls -->
+    <section class="controls">
+      <div class="nav">
+        <button id="prev" class="btn" aria-label="Previous scene">◀ Back</button>
+        <div class="step-indicator">
+          <span id="step-0" class="step current">1</span>
+          <span id="step-1" class="step">2</span>
+          <span id="step-2" class="step">3</span>
+        </div>
+        <button id="next" class="btn" aria-label="Next scene">Next ▶</button>
+      </div>
+      <div class="explore">
+        <label for="countryDropdown" class="dropdown-label">Explore a country:</label>
+        <select id="countryDropdown" class="dropdown" aria-label="Choose a country"></select>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section id="vis-container">
+      <svg id="chart" role="img" aria-label="CO2 emissions per capita chart"></svg>
+      <div id="tooltip" class="tooltip" role="dialog" aria-hidden="true"></div>
+    </section>
+
+    <!-- Small print -->
+    <section class="footnote">
+      <p>Data: Our World in Data (CO₂ emissions per capita). Values shown as reported in the dataset.</p>
+    </section>
+  </main>
+
   <script src="script.js"></script>
 </body>
 </html>
