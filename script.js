@@ -188,7 +188,7 @@ function renderTop5Latest(){
 
   setSceneHeader(
     `Scene 2 — Top 5 Countries in ${latestYear ?? "N/A"}`,
-    "Who emits the most CO₂ per person in the most recent well-covered year?"
+    "Who emits the most CO₂ per person in the most recent year?"
   );
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
