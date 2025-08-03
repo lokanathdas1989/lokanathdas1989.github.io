@@ -272,11 +272,11 @@ function renderTop5Latest(){
   });
 }
 
-/* ---------------- Scene 2: Explore any country ---------------- */
+/* ---------------- Scene 2: Explore selected country ---------------- */
 function renderCountryExplore(){
   dd.style("display","inline-block").property("disabled", false);
 
-  setSceneHeader("Scene 3 — Explore: Any Country",
+  setSceneHeader(`Scene 3 — Explore: ${selectedCountry}`,
     "Use the dropdown (top right) to switch countries and inspect the curve.");
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -291,7 +291,7 @@ function renderCountryExplore(){
     return g.append("text")
       .attr("x", innerWidth/2).attr("y", innerHeight/2)
       .attr("text-anchor","middle").attr("fill","#8a63d2")
-      .text("No numeric CO₂ per capita values for this country.");
+      .text(`No numeric CO₂ per capita values for ${selectedCountry}.`);
   }
 
   const x = d3.scaleLinear().domain(yearExtentClean(series)).range([0, innerWidth]);
