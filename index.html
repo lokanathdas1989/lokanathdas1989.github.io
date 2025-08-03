@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Global CO₂ Emissions Per Capita — Narrative</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -14,19 +15,21 @@
     </header>
 
     <!-- Controls toolbar -->
-    <div class="toolbar">
+    <div class="toolbar" role="group" aria-label="Scene navigation and exploration">
       <div class="nav">
-        <button id="prev" class="btn">◀ Back</button>
-        <div class="steps">
+        <button id="prev" class="btn" type="button" aria-label="Previous scene">◀ Back</button>
+        <div class="steps" aria-hidden="true">
           <span id="step-0" class="step current">1</span>
           <span id="step-1" class="step">2</span>
           <span id="step-2" class="step">3</span>
         </div>
-        <button id="next" class="btn">Next ▶</button>
+        <button id="next" class="btn" type="button" aria-label="Next scene">Next ▶</button>
       </div>
+
+      <!-- IMPORTANT: dropdown starts disabled/hidden; becomes enabled in Scene 3 -->
       <div class="explore">
-        <label for="countryDropdown">Explore:</label>
-        <select id="countryDropdown" class="dropdown"></select>
+        <label for="countryDropdown" class="sr-only">Explore a country</label>
+        <select id="countryDropdown" class="dropdown" aria-label="Explore a country" disabled></select>
       </div>
     </div>
 
@@ -38,7 +41,7 @@
 
     <!-- Chart area -->
     <div id="vis" class="vis">
-      <svg id="chart" width="900" height="520" aria-label="CO₂ per capita chart"></svg>
+      <svg id="chart" width="900" height="540" aria-label="CO₂ per capita chart"></svg>
       <div id="tooltip" class="tooltip" aria-hidden="true"></div>
     </div>
 
