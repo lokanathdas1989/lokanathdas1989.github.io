@@ -60,7 +60,7 @@ function updateSteps(){
   // Dropdown visible & enabled only in Scene 3 (Martini glass)
   const show = scene === 2;
   dd.style("display", show ? "inline-block" : "none")
-    .property("disabled", !show);   // <-- ensure it's enabled in Scene 3
+    .property("disabled", !show);   // ensure it's enabled in Scene 3
 }
 
 function setSceneHeader(title, note){
@@ -107,15 +107,15 @@ function hideTip(){
   tooltip.style("opacity", 0).attr("aria-hidden", "true");
 }
 
-/* ------------- X-domain utilities (ensures years with data included) ------------- */
-// Get [minYear, maxYear] where there is at least one numeric value in the series
+/* ------------- X-domain utilities (ensure years with numeric data) ------------- */
+// Single series (array of {year, value})
 function yearExtentFromSeries(series){
   const years = series.filter(d => Number.isFinite(d.value)).map(d => d.year);
   if (!years.length) return d3.extent(series, d => d.year);
   return [d3.min(years), d3.max(years)];
 }
 
-// For multiple series (e.g., top5), union the years that have numeric values
+// Many rows (e.g., union across multiple countries)
 function yearExtentFromMany(rows){
   const years = rows.filter(d => Number.isFinite(d.value)).map(d => d.year);
   if (!years.length) return d3.extent(rows, d => d.year);
@@ -136,7 +136,7 @@ function renderGlobalAverage(){
   ).map(([year, value]) => ({year, value}))
    .sort((a,b) => a.year - b.year);
 
-  // X-domain covers exactly the years where the aggregated series has numeric values
+  // X-domain covers exactly the years with numeric global average
   const xDomain = yearExtentFromSeries(yearlyAvg);
   const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
   const y = d3.scaleLinear()
@@ -161,7 +161,7 @@ function renderGlobalAverage(){
 
 /* ---------------- Scene 1: Top 5 latest ---------------- */
 function renderTop5Latest(){
-  // latest year (fallback to most recent with enough values)
+  // latest year; if too sparse, fallback to most recent with enough values
   const maxYear = d3.max(data, d => d.year);
   const rowsMax = data.filter(d => d.year === maxYear && Number.isFinite(d.value));
   const latestYear = rowsMax.length >= 10 ? maxYear
@@ -177,7 +177,7 @@ function renderTop5Latest(){
 
   const filtered = data.filter(d => top5.includes(d.country));
 
-  // X-domain spans *all* years that have numeric values among the top-5 series
+  // X-domain spans all years with numeric values among the top-5 countries
   const xDomain = yearExtentFromMany(filtered);
   const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
   const y = d3.scaleLinear()
@@ -222,13 +222,13 @@ function renderCountryExplore(){
   // Make sure dropdown is visible AND enabled
   dd.style("display","inline-block").property("disabled", false);
 
-  const title = selectedCountry ? `Scene 3 — Explore: ${selectedCountry}` : "Scene 3 — Explore";
-  setSceneHeader(title, "Use the dropdown (top right) to switch countries and inspect the curve.");
+  setSceneHeader("Scene 3 — Explore: Any Country",
+    "Use the dropdown (top right) to switch countries and inspect the curve.");
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
   const series = data.filter(d => d.country === selectedCountry).sort((a,b)=>a.year-b.year);
 
-  // X-domain spans only the years where this country has numeric values (falls back to its year range)
+  // X-domain spans only the years with numeric values for this country (fallback to its year range)
   const xDomain = yearExtentFromSeries(series);
   const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
 
