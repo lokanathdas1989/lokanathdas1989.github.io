@@ -1,88 +1,177 @@
-/* ---------- Page background: layered gradients with soft corners ---------- */
-body{
-  margin:0;
-  font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  color:#111;
+/* =========================
+   Global Layout & Theme
+   ========================= */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: #111;
+
+  /* Subtle, layered gradients for depth without stealing focus */
   background:
-    radial-gradient(1200px 800px at 85% -10%, #e9f0ff 0%, rgba(233,240,255,0) 60%),
-    radial-gradient(1200px 800px at -10% 110%, #f6e9ff 0%, rgba(246,233,255,0) 60%),
-    linear-gradient(180deg, #f6f8ff 0%, #eef2f9 40%, #e9eef7 100%);
+    radial-gradient(800px 600px at 85% 10%, rgba(231, 246, 255, 0.85) 0%, rgba(231, 246, 255, 0) 70%),
+    radial-gradient(800px 600px at 15% 90%, rgba(255, 238, 246, 0.85) 0%, rgba(255, 238, 246, 0) 70%),
+    linear-gradient(135deg, #f9fbff 0%, #eef2f9 50%, #f6f8fc 100%);
+  background-attachment: fixed; /* polished feel on scroll */
 }
 
-.wrap{ max-width: 980px; margin: 0 auto; padding: 18px 16px 32px; }
-
-/* ---------- Header ---------- */
-.page-header { text-align:center; margin-bottom: 8px; }
-.page-header h1 { margin:0; font-size:28px; letter-spacing:.2px; }
-
-/* ---------- Controls toolbar ---------- */
-.toolbar{
-  display:flex; align-items:center; justify-content: space-between;
-  background:#fff; border:1px solid #d9e0ee; border-radius: 12px;
-  padding:10px 12px; margin:14px 0;
-  box-shadow: 0 6px 18px rgba(27,40,83,0.10);
-}
-.nav{ display:flex; align-items:center; gap:10px; }
-.btn{
-  padding:8px 14px; border:1px solid #cfd7ea; border-radius:8px;
-  background:#fff; cursor:pointer; font-weight:600;
-}
-.btn:hover{ border-color:#6b7bb8; }
-.steps{ display:flex; gap:6px; }
-.step{
-  width:24px; height:24px; border:1px solid #cfd7ea; border-radius:999px;
-  display:grid; place-items:center; font-size:12px; color:#6b7bb8; background:#f7f9ff;
-}
-.step.current{ border-color:#2f3a63; color:#2f3a63; background:#eef2ff; }
-
-/* Dropdown aligned right; hidden/disabled until Scene 3 */
-.explore{ display:flex; align-items:center; gap:8px; }
-.dropdown{
-  display:none; /* shown in JS for Scene 3 */
-  padding:8px 10px; border:1px solid #cfd7ea; border-radius:8px; background:#fff;
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 18px 16px 32px;
 }
 
-/* Accessibility helper for label (kept for screen readers) */
-.sr-only{
-  position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
-  clip:rect(0,0,0,0); border:0;
+/* =========================
+   Header
+   ========================= */
+.page-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.2px;
 }
 
-/* ---------- Scene header ---------- */
-.scene-header{
-  background:#fff; border:1px solid #d9e0ee; border-radius:12px;
-  padding:14px 16px; margin-bottom:12px;
-  box-shadow: 0 6px 18px rgba(27,40,83,0.08);
+/* =========================
+   Toolbar (navigation + dropdown)
+   ========================= */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(135, 150, 200, 0.25);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 14px 0;
+  box-shadow: 0 8px 22px rgba(27, 40, 83, 0.12);
+  backdrop-filter: saturate(1.1) blur(2px);
 }
-.scene-header h2{ margin:0 0 4px; font-size:18px; }
-.note{ margin:0; color:#444; }
 
-/* ---------- Chart card ---------- */
-.vis{
-  position:relative;
-  background:#fff; border:1px solid #d9e0ee; border-radius: 14px;
-  padding: 10px; overflow: hidden;
-  box-shadow: 0 12px 36px rgba(27,40,83,0.12);
+.nav { display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  padding: 8px 14px;
+  border: 1px solid #cfd7ea;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.04s ease;
 }
-#chart{ display:block; margin: 0 auto; }
+.btn:hover {
+  border-color: #6b7bb8;
+  box-shadow: 0 3px 10px rgba(27, 40, 83, 0.15);
+}
+.btn:active {
+  transform: translateY(1px);
+}
 
-/* ---------- Axes ---------- */
-.axis path, .axis line { stroke:#cfd7ea; shape-rendering: crispEdges; }
-.axis text { fill:#394366; font-size:12px; }
-.axis-label { fill:#2f3a63; font-size:13px; font-weight:600; }
+.steps { display: flex; gap: 6px; }
+.step {
+  width: 24px; height: 24px;
+  border: 1px solid #cfd7ea;
+  border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 12px; color: #6b7bb8; background: #f7f9ff;
+}
+.step.current {
+  border-color: #2f3a63; color: #2f3a63; background: #eef2ff;
+}
 
-/* ---------- Legend ---------- */
-.legend { font-size: 12px; fill:#394366; }
-.legend rect { stroke:#cfd7ea; }
+.explore { display: flex; align-items: center; gap: 8px; }
+.dropdown {
+  display: none; /* toggled in JS for Scene 3 */
+  padding: 8px 10px;
+  border: 1px solid #cfd7ea;
+  border-radius: 10px;
+  background: #fff;
+  min-width: 220px;
+  box-shadow: 0 1px 2px rgba(27, 40, 83, 0.06) inset;
+}
 
-/* ---------- Tooltip ---------- */
-.tooltip{
-  position:absolute; pointer-events:none; opacity:0;
-  background: rgba(23,32,68,0.96); color:#fff; border-radius:8px;
-  padding:8px 10px; font-size:12px; border:1px solid rgba(255,255,255,0.15);
+/* Screen-reader-only label helper */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); border: 0;
+}
+
+/* =========================
+   Scene Header (title + note)
+   ========================= */
+.scene-header {
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(135, 150, 200, 0.25);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 22px rgba(27, 40, 83, 0.10);
+  backdrop-filter: saturate(1.1) blur(2px);
+}
+.scene-header h2 { margin: 0 0 4px; font-size: 18px; }
+.note { margin: 0; color: #444; }
+
+/* =========================
+   Chart Card
+   ========================= */
+.vis {
+  position: relative;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(135, 150, 200, 0.28); /* thin translucent border */
+  border-radius: 16px; /* slightly more rounded */
+  padding: 10px;
+  overflow: hidden;
+  box-shadow: 0 14px 40px rgba(27, 40, 83, 0.16);
+  backdrop-filter: saturate(1.1) blur(1.5px);
+}
+#chart { display: block; margin: 0 auto; }
+
+/* =========================
+   Axes & Labels
+   ========================= */
+.axis path, .axis line {
+  stroke: #cfd7ea;
+  shape-rendering: crispEdges;
+}
+.axis text {
+  fill: #394366;
+  font-size: 12px;
+}
+.axis-label {
+  fill: #2f3a63;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* =========================
+   Legend
+   ========================= */
+.legend { font-size: 12px; fill: #394366; }
+.legend rect { stroke: #cfd7ea; }
+
+/* =========================
+   Tooltip
+   ========================= */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(23, 32, 68, 0.96);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   transform: translate(-50%, -120%);
-  box-shadow: 0 10px 30px rgba(10,16,40,0.35);
+  box-shadow: 0 12px 32px rgba(10, 16, 40, 0.35);
 }
 
-/* ---------- Footer ---------- */
-.foot{ margin-top: 10px; color:#556; font-size:12px; }
+/* =========================
+   Footer
+   ========================= */
+.foot {
+  margin-top: 10px;
+  color: #556;
+  font-size: 12px;
+}
