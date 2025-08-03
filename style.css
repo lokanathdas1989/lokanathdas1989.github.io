@@ -1,149 +1,339 @@
-:root{
-  --bg:#0f172a;          /* slate-900 */
-  --panel:#111827;       /* gray-900 */
-  --ink:#e5e7eb;         /* gray-200 */
-  --muted:#9ca3af;       /* gray-400 */
-  --accent:#60a5fa;      /* blue-400 */
-  --accent-2:#a78bfa;    /* violet-400 */
-  --stroke:#334155;      /* slate-700 */
+// -----------------------------
+// Global state & setup
+// -----------------------------
+let scene = 0;                // 0: Global avg, 1: Top 5 latest, 2: Explore any country
+let data = [];
+let selectedCountry = null;
+
+const svg = d3.select("#chart");
+const container = document.getElementById("vis-container");
+const tooltip = d3.select("#tooltip");
+
+const margin = { top: 64, right: 28, bottom: 64, left: 72 };
+function getSize() {
+  // responsive inner size based on container width
+  const fullW = container.clientWidth - 20;        // padding
+  const fullH = 520;
+  return {
+    width: fullW,
+    height: fullH,
+    innerWidth: Math.max(320, fullW - margin.left - margin.right),
+    innerHeight: Math.max(260, fullH - margin.top - margin.bottom),
+  };
 }
 
-* { box-sizing: border-box; }
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-  background: linear-gradient(180deg, var(--bg) 0%, #0b1220 100%);
-  color: var(--ink);
+// Controls
+const btnNext = d3.select("#next");
+const btnPrev = d3.select("#prev");
+const dd = d3.select("#countryDropdown");
+
+btnNext.on("click", () => { scene = Math.min(2, scene + 1); updateSteps(); render(); });
+btnPrev.on("click", () => { scene = Math.max(0, scene - 1); updateSteps(); render(); });
+
+// Load data (expects real OWID columns: country, year, co2_per_capita)
+d3.csv("data/co2.csv", d => ({
+  country: d.country,
+  year: +d.year,
+  value: d.co2_per_capita === "" ? NaN : +d.co2_per_capita
+})).then(rows => {
+  data = rows.filter(r => isFinite(r.year) && !isNaN(r.year)); // keep all rows, value may be NaN
+  // pick a reasonable default country with the most recent non-NaN data
+  const byCountry = d3.group(data.filter(d => isFinite(d.value)), d => d.country);
+  selectedCountry = Array.from(byCountry.keys()).sort()[0] || "World";
+  setupDropdown();
+  updateSteps();
+  render();
+});
+
+// Re-render on resize
+window.addEventListener("resize", () => render());
+
+// -----------------------------
+// UI helpers
+// -----------------------------
+function setSceneHeader(title, note) {
+  d3.select("#scene-title").text(title);
+  d3.select("#scene-note").text(note);
 }
 
-.page-header{
-  text-align:center;
-  padding: 28px 16px 10px;
-}
-.page-header h1{
-  margin:0;
-  font-weight:700;
-  letter-spacing:0.2px;
-}
-.subtitle{
-  margin:6px 0 0;
-  color: var(--muted);
+function updateSteps(){
+  for (let i=0;i<3;i++){
+    d3.select(`#step-${i}`).classed("current", i === scene);
+  }
 }
 
-.container{
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 16px 40px;
+function setupDropdown(){
+  const countries = Array.from(new Set(data.map(d => d.country))).sort();
+  dd.selectAll("option").data(countries).join("option")
+    .attr("value", d => d)
+    .text(d => d);
+  dd.property("value", selectedCountry);
+  dd.on("change", function(){
+    selectedCountry = this.value;
+    if (scene === 2) render();
+  });
 }
 
-.scene-header{
-  background: rgba(17,24,39,0.6);
-  border: 1px solid var(--stroke);
-  border-radius: 14px;
-  padding: 16px 18px;
-  margin-top: 10px;
-}
-.scene-header h2{
-  margin:0 0 6px 0;
-  font-size: 20px;
-  color: var(--ink);
-}
-.annotation{
-  margin:0;
-  color: var(--muted);
-  line-height:1.35;
+// -----------------------------
+// Scene render dispatcher
+// -----------------------------
+function render(){
+  const { width, height, innerWidth, innerHeight } = getSize();
+  svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+  // clear
+  svg.selectAll("*").remove();
+
+  // toggle dropdown visibility per Martini Glass rules (exploration at the end)
+  dd.style("display", scene === 2 ? "inline-block" : "none");
+
+  if (scene === 0) return renderScene0({ width, height, innerWidth, innerHeight });
+  if (scene === 1) return renderScene1({ width, height, innerWidth, innerHeight });
+  return renderScene2({ width, height, innerWidth, innerHeight });
 }
 
-.controls{
-  display:flex;
-  gap:16px;
-  align-items:center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  margin: 16px 0 8px;
-}
-.nav{ display:flex; align-items:center; gap:12px; }
-.btn{
-  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
-  color: var(--ink);
-  border:1px solid var(--stroke);
-  border-radius: 10px;
-  padding: 8px 14px;
-  cursor:pointer;
-}
-.btn:hover{ border-color: var(--accent); }
+// -----------------------------
+// Common chart primitives
+// -----------------------------
+function makeScales(series, innerWidth, innerHeight){
+  const x = d3.scaleLinear()
+    .domain(d3.extent(series, d => d.year))
+    .range([0, innerWidth]);
 
-.step-indicator{ display:flex; gap:6px; }
-.step{
-  width:24px; height:24px; display:inline-grid; place-items:center;
-  border-radius:999px; border:1px solid var(--stroke); color: var(--muted);
-  font-size: 12px;
-}
-.step.current{ border-color: var(--accent); color: var(--ink); }
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(series, d => d.value || 0)]) // ignore NaNs
+    .nice()
+    .range([innerHeight, 0]);
 
-.explore{
-  display:flex; align-items:center; gap:8px;
-}
-.dropdown-label{ color: var(--muted); }
-.dropdown{
-  display:none; /* visible in Scene 3 */
-  background:#0b1220; color: var(--ink);
-  border:1px solid var(--stroke);
-  padding:8px 10px;
-  border-radius: 10px;
+  return { x, y };
 }
 
-#vis-container{
-  margin-top: 10px;
-  background: rgba(17,24,39,0.5);
-  border: 1px solid var(--stroke);
-  border-radius: 16px;
-  padding: 10px;
-}
-/* Responsive SVG */
-#chart{
-  width: 100%;
-  height: 520px;
-  display:block;
+function drawAxes(g, x, y, innerWidth, innerHeight){
+  g.append("g")
+    .attr("class", "axis")
+    .attr("transform", `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("d")));
+
+  g.append("g")
+    .attr("class", "axis")
+    .call(d3.axisLeft(y).ticks(6));
+
+  // Labels
+  g.append("text")
+    .attr("class", "axis-label")
+    .attr("x", innerWidth / 2)
+    .attr("y", innerHeight + 44)
+    .attr("text-anchor", "middle")
+    .text("Year");
+
+  g.append("text")
+    .attr("class", "axis-label")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -innerHeight / 2)
+    .attr("y", -52)
+    .attr("text-anchor", "middle")
+    .text("CO₂ per capita (tonnes)");
 }
 
-/* Axes */
-.axis path, .axis line { stroke: var(--stroke); }
-.axis text { fill: var(--muted); font-size: 12px; }
-
-.axis-label{
-  fill: var(--muted);
-  font-size: 13px;
+function showTooltip(html, [x,y]){
+  tooltip.html(html)
+    .style("left", `${x}px`)
+    .style("top", `${y}px`)
+    .style("opacity", 1)
+    .attr("aria-hidden", "false");
+}
+function hideTooltip(){
+  tooltip.style("opacity", 0).attr("aria-hidden", "true");
 }
 
-/* Tooltip */
-.tooltip{
-  position: absolute;
-  pointer-events: none;
-  opacity: 0;
-  background: rgba(15,23,42,0.95);
-  color: var(--ink);
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-  transform: translate(-50%, -120%);
-  backdrop-filter: blur(4px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+// Line with focus tooltip (bisector)—great for dense time series
+function addFocusOverlay(g, x, y, series, color, innerWidth, innerHeight, lineStroke="steelblue"){
+  const line = d3.line()
+    .defined(d => isFinite(d.value))
+    .x(d => x(d.year))
+    .y(d => y(d.value));
+
+  g.append("path")
+    .datum(series)
+    .attr("fill", "none")
+    .attr("stroke", lineStroke)
+    .attr("stroke-width", 2)
+    .attr("d", line);
+
+  const focus = g.append("g").style("display", "none");
+  focus.append("circle").attr("r", 4.5).attr("fill", color || lineStroke).attr("stroke", "white").attr("stroke-width", 1.25);
+
+  const bisect = d3.bisector(d => d.year).center;
+  const valid = series.filter(d => isFinite(d.value));
+  const overlay = g.append("rect")
+    .attr("fill", "transparent")
+    .attr("pointer-events", "all")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", innerWidth)
+    .attr("height", innerHeight)
+    .on("mousemove", (event) => {
+      if (!valid.length) return;
+      const [mx,my] = d3.pointer(event);
+      const yearGuess = x.invert(mx);
+      const idx = Math.min(Math.max(bisect(valid, yearGuess), 0), valid.length-1);
+      const d = valid[idx];
+      focus.style("display", null)
+           .attr("transform", `translate(${x(d.year)},${y(d.value)})`);
+      showTooltip(
+        `<strong>${d.year}</strong><br/>${d.value.toFixed(2)} t per person`,
+        [event.pageX, event.pageY - 16]
+      );
+    })
+    .on("mouseleave", () => { focus.style("display","none"); hideTooltip(); });
+
+  return { linePath: line, overlay };
 }
 
-/* Legend */
-.legend{
-  font-size: 12px;
-  fill: var(--muted);
-}
-.legend rect{
-  stroke: var(--stroke);
-  shape-rendering: crispEdges;
+// Legend for multi-line
+function drawLegend(g, items, color, innerWidth){
+  const group = g.append("g").attr("class","legend");
+  const pad = 8, swatch = 12;
+  let x = 0, y = -28;
+
+  items.forEach((name, i) => {
+    const label = name;
+    const w = label.length * 7 + swatch + pad*3;
+    const gItem = group.append("g").attr("transform", `translate(${x},${y})`);
+    gItem.append("rect").attr("width", w).attr("height", 22).attr("fill", "transparent");
+    gItem.append("rect").attr("x", pad).attr("y", 5).attr("width", swatch).attr("height", swatch)
+      .attr("fill", color(name));
+    gItem.append("text").attr("x", pad + swatch + 6).attr("y", 16).text(label);
+    x += w + 8;
+    if (x > innerWidth - 160){ x = 0; y += 26; }
+  });
 }
 
-.footnote{
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 12px;
+// -----------------------------
+// Scene 0 — Global Average
+// -----------------------------
+function renderScene0({ width, height, innerWidth, innerHeight }){
+  setSceneHeader(
+    "Scene 1 — Global Average",
+    "How has global CO₂ per capita changed over time?"
+  );
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // Aggregate to yearly global average (ignore NaNs)
+  const yearly = d3.rollups(
+    data.filter(d => isFinite(d.value)),
+    v => d3.mean(v, d => d.value),
+    d => d.year
+  ).map(([year, value]) => ({ year, value }))
+   .sort((a,b) => a.year - b.year);
+
+  const { x, y } = makeScales(yearly, innerWidth, innerHeight);
+  drawAxes(g, x, y, innerWidth, innerHeight);
+  addFocusOverlay(g, x, y, yearly, "#60a5fa", innerWidth, innerHeight, "#60a5fa");
+}
+
+// -----------------------------
+// Scene 1 — Top 5 (latest year)
+// -----------------------------
+function renderScene1({ width, height, innerWidth, innerHeight }){
+  // Find the latest year with broad coverage
+  const latestYear = d3.max(data, d => d.year);
+  const latestRows = data.filter(d => d.year === latestYear && isFinite(d.value));
+  // If latest year sparse, fallback a bit
+  const latest = latestRows.length >= 10 ? latestYear
+    : d3.max(data, d => d.year && isFinite(d.value));
+
+  setSceneHeader(
+    `Scene 2 — Top 5 Countries in ${latest}`,
+    "Who emits the most CO₂ per person right now?"
+  );
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const atLatest = data.filter(d => d.year === latest && isFinite(d.value));
+  const top5 = atLatest.sort((a,b) => b.value - a.value).slice(0,5).map(d => d.country);
+
+  const filtered = data.filter(d => top5.includes(d.country));
+  const extentYears = d3.extent(filtered, d => d.year);
+  const maxVal = d3.max(filtered, d => d.value || 0);
+
+  const x = d3.scaleLinear().domain(extentYears).range([0, innerWidth]);
+  const y = d3.scaleLinear().domain([0, maxVal]).nice().range([innerHeight, 0]);
+  drawAxes(g, x, y, innerWidth, innerHeight);
+
+  const color = d3.scaleOrdinal()
+    .domain(top5)
+    .range(["#60a5fa","#a78bfa","#34d399","#fbbf24","#f472b6"]); // blue, violet, green, amber, pink
+
+  drawLegend(g, top5, color, innerWidth);
+
+  const line = d3.line()
+    .defined(d => isFinite(d.value))
+    .x(d => x(d.year))
+    .y(d => y(d.value));
+
+  top5.forEach(name => {
+    const series = filtered.filter(d => d.country === name).sort((a,b) => a.year - b.year);
+    g.append("path")
+      .datum(series)
+      .attr("fill", "none")
+      .attr("stroke", color(name))
+      .attr("stroke-width", 2)
+      .attr("d", line);
+
+    // Hover dots for clarity (subsample for performance if very long)
+    const subsample = series.length > 200
+      ? series.filter((_, i) => i % Math.ceil(series.length/200) === 0)
+      : series;
+
+    g.selectAll(`.dot-${CSS.escape(name)}`)
+      .data(subsample)
+      .join("circle")
+      .attr("cx", d => x(d.year))
+      .attr("cy", d => y(d.value))
+      .attr("r", 3)
+      .attr("fill", color(name))
+      .on("mousemove", (event, d) => {
+        showTooltip(
+          `<strong>${name}</strong><br/>Year: ${d.year}<br/>${d.value.toFixed(2)} t per person`,
+          [event.pageX, event.pageY - 16]
+        );
+      })
+      .on("mouseleave", hideTooltip);
+  });
+}
+
+// -----------------------------
+// Scene 2 — Explore (Dropdown)
+// -----------------------------
+function renderScene2({ width, height, innerWidth, innerHeight }){
+  setSceneHeader(
+    `Scene 3 — Explore ${selectedCountry}`,
+    "Use the dropdown to change country and inspect its trajectory."
+  );
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const series = data
+    .filter(d => d.country === selectedCountry)
+    .sort((a,b) => a.year - b.year);
+
+  const { x, y } = makeScales(series, innerWidth, innerHeight);
+  drawAxes(g, x, y, innerWidth, innerHeight);
+
+  // Focus overlay line with bisector tooltip
+  addFocusOverlay(g, x, y, series, "#a78bfa", innerWidth, innerHeight, "#a78bfa");
+
+  // Label last value on the line, if present
+  const lastValid = [...series].reverse().find(d => isFinite(d.value));
+  if (lastValid){
+    const lx = x(lastValid.year), ly = y(lastValid.value);
+    g.append("text")
+      .attr("x", lx + 6)
+      .attr("y", ly - 6)
+      .attr("fill", "#e5e7eb")
+      .attr("font-size", 12)
+      .text(`${lastValid.year}: ${lastValid.value.toFixed(2)}`);
+  }
 }
