@@ -1,4 +1,4 @@
-// ===== Fixed-size, simple, robust implementation =====
+// ===== Robust, fixed-size implementation =====
 let scene = 0;  // 0: global average, 1: top5 latest, 2: explore any country
 let data = [];
 let selectedCountry = null;
@@ -9,7 +9,7 @@ const dd = d3.select("#countryDropdown");
 const btnNext = d3.select("#next");
 const btnPrev = d3.select("#prev");
 
-const margin = { top: 54, right: 32, bottom: 70, left: 84 }; // more margin so axis labels never clip
+const margin = { top: 54, right: 32, bottom: 70, left: 84 };
 const width  = +svg.attr("width");
 const height = +svg.attr("height");
 const innerWidth  = width - margin.left - margin.right;
@@ -24,28 +24,29 @@ d3.csv("data/co2.csv", d => ({
   year: +d.year,
   value: d.co2_per_capita === "" ? NaN : +d.co2_per_capita
 })).then(rows => {
-  // keep all rows (even if value is NaN) so scales cover full time range
+  // Keep rows with a numeric year; value can be NaN (missing)
   data = rows.filter(r => Number.isFinite(r.year));
 
-  // Pick a default country with non-NaN values; fallback to first unique country if needed
+  // Choose a default country with at least one numeric value
   const countriesWithValues = Array.from(
     d3.group(data.filter(d => Number.isFinite(d.value)), d => d.country).keys()
   ).sort();
-  const uniqueCountries = Array.from(new Set(data.map(d => d.country))).sort();
+  const allCountries = Array.from(new Set(data.map(d => d.country))).sort();
 
-  selectedCountry = countriesWithValues[0] || uniqueCountries[0] || null;
+  selectedCountry = countriesWithValues[0] || allCountries[0] || null;
 
-  setupDropdown(uniqueCountries);
+  setupDropdown(allCountries);
   updateSteps();
   render();
 });
 
+/* ---------------- Helpers ---------------- */
 function setupDropdown(countries){
   dd.selectAll("option").data(countries).join("option")
-    .attr("value", d => d).text(d => d);
+    .attr("value", d => d)
+    .text(d => d);
   if (selectedCountry) dd.property("value", selectedCountry);
 
-  // IMPORTANT: ensure the dropdown really triggers re-render
   dd.on("change", function(){
     selectedCountry = this.value;
     if (scene === 2) render();
@@ -56,10 +57,10 @@ function updateSteps(){
   for (let i=0;i<3;i++){
     d3.select(`#step-${i}`).classed("current", i === scene);
   }
-  // Dropdown is visible & enabled only in Scene 3 (Martini Glass)
+  // Dropdown visible & enabled only in Scene 3 (Martini glass)
   const show = scene === 2;
   dd.style("display", show ? "inline-block" : "none")
-    .property("disabled", !show);
+    .property("disabled", !show);   // <-- ensure it's enabled in Scene 3
 }
 
 function setSceneHeader(title, note){
@@ -76,7 +77,6 @@ function render(){
   return renderCountryExplore();
 }
 
-/* ---------- Common helpers ---------- */
 function drawAxes(g, x, y){
   g.append("g").attr("class","axis")
     .attr("transform", `translate(0,${innerHeight})`)
@@ -85,12 +85,11 @@ function drawAxes(g, x, y){
   g.append("g").attr("class","axis")
     .call(d3.axisLeft(y).ticks(6));
 
-  // X label centered below
+  // Axis labels
   g.append("text").attr("class","axis-label")
     .attr("x", innerWidth/2).attr("y", innerHeight + 52)
     .attr("text-anchor","middle").text("Year");
 
-  // Y label rotated and centered; extra left margin so it’s never cut off
   g.append("text").attr("class","axis-label")
     .attr("transform","rotate(-90)")
     .attr("x", -innerHeight/2).attr("y", -64)
@@ -108,7 +107,22 @@ function hideTip(){
   tooltip.style("opacity", 0).attr("aria-hidden", "true");
 }
 
-/* ---------- Scene 0: Global average ---------- */
+/* ------------- X-domain utilities (ensures years with data included) ------------- */
+// Get [minYear, maxYear] where there is at least one numeric value in the series
+function yearExtentFromSeries(series){
+  const years = series.filter(d => Number.isFinite(d.value)).map(d => d.year);
+  if (!years.length) return d3.extent(series, d => d.year);
+  return [d3.min(years), d3.max(years)];
+}
+
+// For multiple series (e.g., top5), union the years that have numeric values
+function yearExtentFromMany(rows){
+  const years = rows.filter(d => Number.isFinite(d.value)).map(d => d.year);
+  if (!years.length) return d3.extent(rows, d => d.year);
+  return [d3.min(years), d3.max(years)];
+}
+
+/* ---------------- Scene 0: Global average ---------------- */
 function renderGlobalAverage(){
   setSceneHeader("Scene 1 — Global Average",
     "How has global CO₂ per capita changed over time?");
@@ -122,22 +136,16 @@ function renderGlobalAverage(){
   ).map(([year, value]) => ({year, value}))
    .sort((a,b) => a.year - b.year);
 
-  // If dataset has sparse early years, guard scales
-  const x = d3.scaleLinear()
-    .domain(d3.extent(yearlyAvg, d => d.year))
-    .range([0, innerWidth]);
-
+  // X-domain covers exactly the years where the aggregated series has numeric values
+  const xDomain = yearExtentFromSeries(yearlyAvg);
+  const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
   const y = d3.scaleLinear()
     .domain([0, d3.max(yearlyAvg, d => d.value) || 1])
-    .nice()
-    .range([innerHeight, 0]);
+    .nice().range([innerHeight, 0]);
 
   drawAxes(g, x, y);
 
-  const line = d3.line()
-    .x(d => x(d.year))
-    .y(d => y(d.value));
-
+  const line = d3.line().x(d => x(d.year)).y(d => y(d.value));
   g.append("path")
     .datum(yearlyAvg)
     .attr("fill","none").attr("stroke","#1f77b4").attr("stroke-width",2)
@@ -151,9 +159,9 @@ function renderGlobalAverage(){
     .on("mouseleave", hideTip);
 }
 
-/* ---------- Scene 1: Top 5 latest ---------- */
+/* ---------------- Scene 1: Top 5 latest ---------------- */
 function renderTop5Latest(){
-  // find the latest year; if too sparse, fallback to most recent with sufficient points
+  // latest year (fallback to most recent with enough values)
   const maxYear = d3.max(data, d => d.year);
   const rowsMax = data.filter(d => d.year === maxYear && Number.isFinite(d.value));
   const latestYear = rowsMax.length >= 10 ? maxYear
@@ -168,15 +176,20 @@ function renderTop5Latest(){
   const top5 = atLatest.sort((a,b) => b.value - a.value).slice(0,5).map(d => d.country);
 
   const filtered = data.filter(d => top5.includes(d.country));
-  const x = d3.scaleLinear().domain(d3.extent(filtered, d => d.year)).range([0, innerWidth]);
-  const y = d3.scaleLinear().domain([0, d3.max(filtered, d => d.value) || 1]).nice().range([innerHeight, 0]);
+
+  // X-domain spans *all* years that have numeric values among the top-5 series
+  const xDomain = yearExtentFromMany(filtered);
+  const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(filtered, d => d.value) || 1])
+    .nice().range([innerHeight, 0]);
 
   drawAxes(g, x, y);
 
   const palette = ["#1f77b4","#9467bd","#2ca02c","#ff7f0e","#d62728"];
   const color = d3.scaleOrdinal().domain(top5).range(palette);
 
-  // Simple legend (never overlaps axes)
+  // Legend
   const legend = g.append("g").attr("class","legend").attr("transform","translate(0,-28)");
   top5.forEach((c,i) => {
     const group = legend.append("g").attr("transform", `translate(${i*175},0)`);
@@ -204,9 +217,9 @@ function renderTop5Latest(){
   });
 }
 
-/* ---------- Scene 2: Explore any country ---------- */
+/* ---------------- Scene 2: Explore any country ---------------- */
 function renderCountryExplore(){
-  // Ensure dropdown is visible & enabled
+  // Make sure dropdown is visible AND enabled
   dd.style("display","inline-block").property("disabled", false);
 
   const title = selectedCountry ? `Scene 3 — Explore: ${selectedCountry}` : "Scene 3 — Explore";
@@ -215,14 +228,14 @@ function renderCountryExplore(){
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
   const series = data.filter(d => d.country === selectedCountry).sort((a,b)=>a.year-b.year);
 
-  // Guard: if user selects a country with no numeric values
-  const hasValues = series.some(s => Number.isFinite(s.value));
+  // X-domain spans only the years where this country has numeric values (falls back to its year range)
+  const xDomain = yearExtentFromSeries(series);
+  const x = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
 
-  const x = d3.scaleLinear().domain(d3.extent(series, d => d.year)).range([0, innerWidth]);
+  const hasValues = series.some(s => Number.isFinite(s.value));
   const y = d3.scaleLinear()
     .domain([0, hasValues ? d3.max(series, d => d.value) : 1])
-    .nice()
-    .range([innerHeight, 0]);
+    .nice().range([innerHeight, 0]);
 
   drawAxes(g, x, y);
 
@@ -250,7 +263,6 @@ function renderCountryExplore(){
       .text(`${last.year}: ${last.value.toFixed(2)}`);
   }
 
-  // If no numeric values, inform the user
   if (!hasValues){
     g.append("text")
       .attr("x", innerWidth/2)
