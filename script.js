@@ -1,5 +1,5 @@
-// ===== Fixed-size D3 narrative (NaNs removed, aggregates excluded, dynamic Scene 3 title) =====
-let scene = 0;  // 0: global average, 1: top5 latest, 2: explore selected country
+// ===== Martini Glass Narrative Visualization =====
+let scene = 0;
 let data = [];
 let selectedCountry = null;
 
@@ -18,7 +18,7 @@ const innerHeight = height - margin.top - margin.bottom;
 btnNext.on("click", () => { scene = Math.min(2, scene + 1); updateSteps(); render(); });
 btnPrev.on("click", () => { scene = Math.max(0, scene - 1); updateSteps(); render(); });
 
-// --- Robust numeric parse for co2_per_capita ---
+// --- Numeric parse for co2_per_capita ---
 function parseValue(raw){
   const v = (raw ?? "").toString().trim();
   if (!v) return NaN;
@@ -32,7 +32,7 @@ d3.csv("data/co2.csv", d => ({
   year: +d.year,
   value: parseValue(d.co2_per_capita)
 })).then(rows => {
-  // Keep rows with numeric year; value may be NaN (we'll clean per scene)
+  // Keep rows with numeric year; value with NaN will be cleaned per scene)
   data = rows.filter(r => Number.isFinite(r.year));
 
   // Default country = first with numeric values (else first alphabetically)
@@ -66,7 +66,7 @@ function isAggregate(name){
   ].some(term => k.includes(term));
 }
 
-/* ---------------- UI wiring ---------------- */
+/* ---------------- UI pairing ---------------- */
 function setupDropdown(countries){
   dd.selectAll("option").data(countries).join("option")
     .attr("value", d => d).text(d => d);
@@ -263,7 +263,7 @@ function renderTop5Latest(){
   });
 }
 
-/* ---------------- Scene 2: Explore selected country (dynamic title) ---------------- */
+/* ---------------- Scene 2: Explore selected country (with dynamic title) ---------------- */
 function renderCountryExplore(){
   dd.style("display","inline-block").property("disabled", false);
 
