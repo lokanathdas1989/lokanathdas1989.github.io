@@ -1,25 +1,6 @@
-
-body {
-  font-family: sans-serif;
-  text-align: center;
-  background: #f8f8f8;
-}
-#title {
-  font-size: 2em;
-  margin-top: 20px;
-}
-#vis-container {
-  margin: 30px auto;
-  width: 900px;
-}
-#nav-buttons {
-  margin-top: 20px;
-}
-button {
-  padding: 10px 20px;
-  font-size: 1em;
-}
-.annotation {
-  font-size: 14px;
-  fill: #333;
-}
+body { font-family: sans-serif; text-align: center; background: #f8f8f8; }
+#title { font-size: 2em; margin-top: 20px; }
+#vis-container { margin: 30px auto; width: 900px; }
+#nav-buttons { margin-top: 20px; }
+button { padding: 10px 20px; font-size: 1em; }
+.annotation { font-size: 14px; fill: #333; }
