@@ -1,10 +1,12 @@
-/* ---------- Page background with subtle contrast ---------- */
+/* ---------- Page background: layered gradients with soft corners ---------- */
 body{
   margin:0;
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   color:#111;
   background:
-    linear-gradient(180deg, #f5f7fb 0%, #eef2f9 35%, #e9edf7 100%);
+    radial-gradient(1200px 800px at 85% -10%, #e9f0ff 0%, rgba(233,240,255,0) 60%),
+    radial-gradient(1200px 800px at -10% 110%, #f6e9ff 0%, rgba(246,233,255,0) 60%),
+    linear-gradient(180deg, #f6f8ff 0%, #eef2f9 40%, #e9eef7 100%);
 }
 
 .wrap{ max-width: 980px; margin: 0 auto; padding: 18px 16px 32px; }
@@ -12,14 +14,13 @@ body{
 /* ---------- Header ---------- */
 .page-header { text-align:center; margin-bottom: 8px; }
 .page-header h1 { margin:0; font-size:28px; letter-spacing:.2px; }
-.subtitle { margin:6px 0 0; color:#555; }
 
 /* ---------- Controls toolbar ---------- */
 .toolbar{
   display:flex; align-items:center; justify-content: space-between;
-  background:#fff; border:1px solid #d9e0ee; border-radius: 10px;
+  background:#fff; border:1px solid #d9e0ee; border-radius: 12px;
   padding:10px 12px; margin:14px 0;
-  box-shadow: 0 4px 14px rgba(27,40,83,0.08);
+  box-shadow: 0 6px 18px rgba(27,40,83,0.10);
 }
 .nav{ display:flex; align-items:center; gap:10px; }
 .btn{
@@ -49,9 +50,9 @@ body{
 
 /* ---------- Scene header ---------- */
 .scene-header{
-  background:#fff; border:1px solid #d9e0ee; border-radius:10px;
+  background:#fff; border:1px solid #d9e0ee; border-radius:12px;
   padding:14px 16px; margin-bottom:12px;
-  box-shadow: 0 4px 14px rgba(27,40,83,0.07);
+  box-shadow: 0 6px 18px rgba(27,40,83,0.08);
 }
 .scene-header h2{ margin:0 0 4px; font-size:18px; }
 .note{ margin:0; color:#444; }
@@ -59,9 +60,9 @@ body{
 /* ---------- Chart card ---------- */
 .vis{
   position:relative;
-  background:#fff; border:1px solid #d9e0ee; border-radius: 12px;
+  background:#fff; border:1px solid #d9e0ee; border-radius: 14px;
   padding: 10px; overflow: hidden;
-  box-shadow: 0 10px 30px rgba(27,40,83,0.08);
+  box-shadow: 0 12px 36px rgba(27,40,83,0.12);
 }
 #chart{ display:block; margin: 0 auto; }
 
