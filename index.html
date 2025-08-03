@@ -1,1 +1,93 @@
-Hello World
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Narrative Visualization</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/d3-annotation@2"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .annotation { fill: #333; font-size: 14px; }
+    .scene-button { margin: 5px; padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">My Narrative Visualization</h1>
+  <div id="buttons"></div>
+  <svg id="viz" width="800" height="400"></svg>
+
+  <script>
+    // 1. Data
+    const myData = [
+      { category: "A", value: 10 },
+      { category: "B", value: 30 },
+      { category: "C", value: 20 }
+    ];
+
+    // 2. Parameters / state
+    let currentScene = 0;
+
+    // 3. Scene definitions
+    const scenes = [
+      { title: "Overview: Categories and Values", annotation: "This shows total values by category", filter: null },
+      { title: "Highlight A vs B", annotation: "A is smaller than B", filter: d => d.category !== "C" },
+      { title: "Focus on C", annotation: "C category is 20 units", filter: d => d.category === "C" }
+    ];
+
+    // 4. Scene rendering function
+    function renderScene() {
+      const scene = scenes[currentScene];
+      d3.select("#title").text(scene.title);
+
+      const filtered = scene.filter ? myData.filter(scene.filter) : myData;
+
+      const svg = d3.select("#viz");
+      svg.selectAll("*").remove();
+
+      const x = d3.scaleBand().domain(filtered.map(d => d.category)).range([50, 750]).padding(0.4);
+      const y = d3.scaleLinear().domain([0, d3.max(filtered, d => d.value)]).nice().range([350, 50]);
+
+      svg.append("g").attr("transform", "translate(0,350)").call(d3.axisBottom(x));
+      svg.append("g").attr("transform", "translate(50,0)").call(d3.axisLeft(y));
+
+      svg.selectAll(".bar")
+        .data(filtered)
+        .join("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.category))
+        .attr("width", x.bandwidth())
+        .attr("y", d => y(d.value))
+        .attr("height", d => 350 - y(d.value))
+        .attr("fill", "steelblue");
+
+      const makeAnnotation = d3.annotation()
+        .annotations([{
+          note: { label: scene.annotation, title: "" },
+          x: x(filtered[0].category) + x.bandwidth() / 2,
+          y: y(filtered[0].value),
+          dy: -40,
+          dx: 0
+        }]);
+
+      svg.append("g")
+        .attr("class", "annotation-group")
+        .call(makeAnnotation);
+    }
+
+    // 5. Triggers: buttons to navigate scenes
+    const btnDiv = d3.select("#buttons");
+    scenes.forEach((s, i) => {
+      btnDiv.append("button")
+        .attr("class", "scene-button")
+        .text("Scene " + (i + 1))
+        .on("click", () => {
+          currentScene = i;
+          renderScene();
+        });
+    });
+
+    // Initial render
+    renderScene();
+  </script>
+</body>
+</html>
